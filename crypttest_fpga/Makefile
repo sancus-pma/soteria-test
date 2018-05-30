@@ -6,7 +6,7 @@ STACK     = 256
 VENDOR_ID = 1234
 NODE_KEY  = deadbeefcafebabedeadbeefcafebabe
 
-OBJS      = sm_loader.o ctest.o other.o main.o aes.o
+OBJS      = sm_loader.o ctest.o other.o main.o aes.o uart.o
 CFLAGS    = -Wall -Werror
 
 

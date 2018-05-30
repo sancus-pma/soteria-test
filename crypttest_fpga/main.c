@@ -2,8 +2,7 @@
 #include <stdio.h>
 #include <sancus/sm_support.h>
 
-#include "hardware.h"
-
+#include "uart.h"
 #include "sm_loader.h"
 #include "ctest.h"
 #include "other.h"
@@ -15,10 +14,10 @@ static char mac[16];
 
 int putchar(int c)
 {
-    while (UART_STAT & UART_TX_FULL);
+    if (c == '\n')
+        putchar('\r');
 
-    UART_TXD = c;
-
+    uart_write_byte(c);
     return c;
 }
 
@@ -42,12 +41,7 @@ int main()
     WDTCTL = WDTPW | WDTHOLD;
 
     // init uart
-    UART_BAUD = BAUD;
-    UART_CTL  = UART_EN;
-
-    // show some light
-    P3DIR  = 0x0f;
-    P3OUT  = 0x0f;
+    uart_init();
 
     printf("Start of main()\n");
 
