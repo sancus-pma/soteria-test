@@ -34,8 +34,9 @@
 /* Includes:                                                                 */
 /*****************************************************************************/
 #include <stdint.h>
-#include <string.h>
+//#include <string.h>
 #include "aes.h"
+#include <sancus/sm_support.h>
 
 
 /*****************************************************************************/
@@ -54,12 +55,12 @@
 /*****************************************************************************/
 /* Public variables:                                                         */
 /*****************************************************************************/
-uint8_t        AES128_RoundKey[176];
-uint8_t        AES128_Iv[16];
+uint8_t       SM_DATA("sm_loader")  AES128_RoundKey[176];
+uint8_t       SM_DATA("sm_loader")  AES128_Iv[16];
 
-const uint8_t *AES128_Input;
-uint8_t       *AES128_Output;
-uint16_t       AES128_Length;
+const uint8_t SM_DATA("sm_loader") *AES128_Input;
+uint8_t       SM_DATA("sm_loader") *AES128_Output;
+uint16_t      SM_DATA("sm_loader")  AES128_Length;
 
 
 /*****************************************************************************/
@@ -67,11 +68,13 @@ uint16_t       AES128_Length;
 /*****************************************************************************/
 // state - array holding the intermediate results during decryption.
 typedef uint8_t state_t[4][4];
+SM_DATA("sm_loader")
 static state_t* state;
 
 // The lookup-tables are marked const so they can be placed in read-only storage instead of RAM
 // The numbers below can be computed dynamically trading ROM for RAM - 
 // This can be useful in (embedded) bootloader applications, where ROM is often limited.
+SM_DATA("sm_loader")
 static const uint8_t sbox[256] =   {
   //0     1    2      3     4    5     6     7      8    9     A      B    C     D     E     F
   0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
@@ -94,6 +97,7 @@ static const uint8_t sbox[256] =   {
 // The round constant word array, Rcon[i], contains the values given by 
 // x to th e power (i-1) being powers of x (x is denoted as {02}) in the field GF(2^8)
 // Note that i starts at 1, not 0).
+SM_DATA("sm_loader")
 static const uint8_t Rcon[255] = {
   0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a, 
   0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 
@@ -116,12 +120,34 @@ static const uint8_t Rcon[255] = {
 /*****************************************************************************/
 /* Private functions:                                                        */
 /*****************************************************************************/
-static uint8_t getSBoxValue(uint8_t num)
+
+void SM_FUNC("sm_loader") *loader_memcpy(void *dest, const void *src, size_t n)
+{
+    int i;
+    char *d = (char*) dest;
+    char *s = (char*) src;
+    for (i = 0; i < n; i++)
+        *(d+i) = *(s+i);
+    return dest;
+}
+
+void SM_FUNC("sm_loader") *loader_memset(void *s, int c, size_t n)
+{
+    int i;
+    char *d = (char*) s;
+    for (i = 0; i < n; i++)
+        *(d+i) = c;
+
+    return s;
+}
+
+static uint8_t SM_FUNC("sm_loader") getSBoxValue(uint8_t num)
 {
   return sbox[num];
 }
 
 // This function produces Nb(Nr+1) round keys. The round keys are used in each round to decrypt the states. 
+SM_FUNC("sm_loader")
 static void KeyExpansion(void)
 {
   uint16_t i, j;
@@ -181,6 +207,7 @@ static void KeyExpansion(void)
 
 // This function adds the round key to state.
 // The round key is added to the state by an XOR function.
+SM_FUNC("sm_loader")
 static void AddRoundKey(uint8_t round)
 {
   uint8_t i,j;
@@ -195,6 +222,7 @@ static void AddRoundKey(uint8_t round)
 
 // The SubBytes Function Substitutes the values in the
 // state matrix with values in an S-box.
+SM_FUNC("sm_loader")
 static void SubBytes(void)
 {
   uint8_t i, j;
@@ -210,6 +238,7 @@ static void SubBytes(void)
 // The ShiftRows() function shifts the rows in the state to the left.
 // Each row is shifted with different offset.
 // Offset = Row number. So the first row is not shifted.
+SM_FUNC("sm_loader")
 static void ShiftRows(void)
 {
   uint8_t temp;
@@ -238,12 +267,17 @@ static void ShiftRows(void)
   (*state)[1][3] = temp;
 }
 
+#if 0
+//XXX SM_FUNC("sm_loader")
 static uint8_t xtime(uint8_t x)
 {
   return ((x<<1) ^ (((x>>7) & 1) * 0x1b));
 }
+#endif
+uint8_t xtime(uint8_t x);
 
 // MixColumns function mixes the columns of the state matrix
+SM_FUNC("sm_loader")
 static void MixColumns(void)
 {
   uint8_t i;
@@ -260,6 +294,7 @@ static void MixColumns(void)
 }
 
 // Cipher is the main function that encrypts the PlainText.
+SM_FUNC("sm_loader")
 static void Cipher(void)
 {
   uint8_t round = 0;
@@ -303,7 +338,7 @@ static void Cipher(void)
  * This avoids allocating one more 16 bytes buffer while allowing src == dst.
  */
 #define CTR_CRYPT(dst, src)                                                  \
-  memcpy(b, ctr, 16);                                                        \
+  loader_memcpy(b, ctr, 16);                                                        \
   state = (state_t *)b;                                                      \
   Cipher();                                                                  \
                                                                              \
@@ -314,6 +349,7 @@ static void Cipher(void)
 /*****************************************************************************/
 /* Public functions:                                                         */
 /*****************************************************************************/
+SM_FUNC("sm_loader")
 int AES128_CCM_decrypt(void)
 {
   uint8_t i;
@@ -347,13 +383,13 @@ int AES128_CCM_decrypt(void)
   b[0] |= ( ( 16 - 2 ) / 2 ) << 3;
   b[0] |= q - 1;
 
-  memcpy(&b[1], AES128_Iv, 13);
+  loader_memcpy(&b[1], AES128_Iv, 13);
 
   b[15] = (uint8_t)(AES128_Length & 0xff);
   b[14] = (uint8_t)((AES128_Length >> 8) & 0xff);
 
   /* Start CBC-MAC with first block */
-  memset(y, 0, 16);
+  loader_memset(y, 0, 16);
   UPDATE_CBC_MAC;
 
   /*
@@ -367,8 +403,8 @@ int AES128_CCM_decrypt(void)
    * 2 .. 0   q - 1
    */
   ctr[0] = q - 1;
-  memcpy(&ctr[1], AES128_Iv, 13);
-  memset(&ctr[1 + 13], 0, q);
+  loader_memcpy(&ctr[1], AES128_Iv, 13);
+  loader_memset(&ctr[1 + 13], 0, q);
   ctr[15] = 1;
 
   /*
@@ -380,7 +416,7 @@ int AES128_CCM_decrypt(void)
 
   while (len_left > 0) {
     CTR_CRYPT(dst, src);
-    memcpy(b, dst, 16);
+    loader_memcpy(b, dst, 16);
     UPDATE_CBC_MAC;
 
     dst += 16;
@@ -408,12 +444,12 @@ int AES128_CCM_decrypt(void)
   for (diff = 0, i = 0; i < 16; i++)
     diff |= y[i] ^ src[i];
 
-  memset(b, 0, 16);
-  memset(y, 0, 16);
-  memset(ctr, 0, 16);
+  loader_memset(b, 0, 16);
+  loader_memset(y, 0, 16);
+  loader_memset(ctr, 0, 16);
 
   if (diff != 0) {
-    memset(AES128_Output, 0, AES128_Length);
+    loader_memset(AES128_Output, 0, AES128_Length);
     return 0;
   }
 
